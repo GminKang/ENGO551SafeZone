@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "605745298875",
+    "project_id": "engo551",
+    "storage_bucket": "engo551.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:605745298875:android:3ccd5af6127c894ae9589e",
+        "android_client_info": {
+          "package_name": "com.example.safezone"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "605745298875-28ct071v2jvhmlms7aiivaqf57213ffh.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.safezone",
+            "certificate_hash": "77cc66037fc35aa69177f7e7f9595f2092ccce69"
+          }
+        },
+        {
+          "client_id": "605745298875-eihm96m7bbamu5omeq0iqmfb2mi9ruuk.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDz4kcvSRimd7Ia_cpVfP9mYiF_zZqXoAw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "605745298875-eihm96m7bbamu5omeq0iqmfb2mi9ruuk.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
