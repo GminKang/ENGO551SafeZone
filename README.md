@@ -3,7 +3,7 @@ Created by Zifan Zhang, Seema Mustaqeem, Luc Nicolet, Min Kang<br><br>
 Safezone is an app designed for users to create a safe area, such as their workplace, home, or any place they intend to stay for a while. The app monitors the user's trip and sends notifications when the user enters or leaves their safe zone. This can help protect users from potential dangers, such as kidnapping or going missing.
 
 ## Installation
-Download Android Studio 
+Download Android Studio <br>
 https://developer.android.com/studio?gclid=CjwKCAjw586hBhBrEiwAQYEnHe3Kuu3YQRJg9g2s81rw5KwXbrp53ELkDSOEQV3DKhujUdPpF3VAuxoCbYkQAvD_BwE&gclsrc=aw.ds
 
 ### Emulator
