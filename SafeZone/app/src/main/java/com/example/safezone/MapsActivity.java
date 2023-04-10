@@ -93,6 +93,19 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
+/*
+public class MapsActivity: Google Maps Avtivity class
+
+extends AppCompatActivity: built-in Android class that provides a base for activities that use the appcompat library features, such as a toolbar, action bar, or navigation drawer.
+
+OnMapReadyCallback: An interface used to notify when the map is ready to be used.
+GoogleMap.OnMarkerClickListener: An interface used to handle marker click events on the map.
+GoogleMap.OnMapLongClickListener: An interface used to handle long click events on the map.
+LocationListener: An interface used to handle location change events.
+GeoQueryEventListener: An interface used to handle events related to GeoFire queries.
+Overall, this class appears to be defining a MapsActivity that uses Google Maps, GeoFire, and location-based functionality in an Android application.
+*/
+
 public class MapsActivity extends AppCompatActivity implements OnMapReadyCallback, GoogleMap.OnMarkerClickListener,GoogleMap.OnMapLongClickListener, LocationListener, GeoQueryEventListener {
 
     private GoogleMap mMap;
@@ -104,28 +117,40 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     private com.google.android.gms.location.LocationRequest locationRequest;
 
     private Marker currentLocationMarker;
-    private FusedLocationProviderClient fusedLocationProviderClient;
-    private float GEOFENCE_RADIUS = 500;
+    private FusedLocationProviderClient fusedLocationProviderClient; //Getting the current user location
+    private float GEOFENCE_RADIUS = 500; //A radius of the geofence
     private int FINE_LOCATION_ACCESS_REQUEST_CODE = 10001;
     private int BACKGROUND_LOCATION_ACCESS_REQUEST_CODE = 10002;
 
-    private boolean locationPermissionGranted = false;
-    private ActivityMapsBinding binding;
-    private LatLng geofenceLatLng;
-    private static final String INTENT_ACTION = "com.example.safezone.transition";
+    private boolean locationPermissionGranted = false; //Check location permission
+    private ActivityMapsBinding binding; //used to bind the layout for your activity with the corresponding views(needed to add the search bar!!).
+    private LatLng geofenceLatLng; //center of the geofence
+   // private static final String INTENT_ACTION = "com.example.safezone.transition";
 
-    private GeofenceBroadcastReceiver receiver = new GeofenceBroadcastReceiver();
-    private IntentFilter intentFilter = new IntentFilter(INTENT_ACTION);
-    private BroadcastReceiver myBroadcastReceiver;
+   // private GeofenceBroadcastReceiver receiver = new GeofenceBroadcastReceiver();
+//    private IntentFilter intentFilter = new IntentFilter(INTENT_ACTION);
+ //   private BroadcastReceiver myBroadcastReceiver;
     private DatabaseReference myLocationRef;
     private GeoFire geoFire;
     private List<LatLng> safeZone;
-    private LocationCallback locationCallback;
+    private LocationCallback locationCallback; // used to receive location updates from the device's location provider
 
 
-    private Boolean ENTERED = false;
+  //  private Boolean ENTERED = false;
 
 
+    /*
+    onCreate is used to initialize the activity, such as setting the layout, initializing views.
+    Called Dexter to request location permissions
+    Once the permission is granted, it calls buildLocationCallback and buildLocationRequest
+    buildLocationCallback - receives the device's location
+    buildLocationRequest - sets locationRequest parameters:
+        setInterval: location update interval
+        setPriority: accuracy level of the location data
+        setSmallestDisplacement - minimum distance the user moves before a new location update is sent
+        setFastestInterval - fastest location update interval(useful when tracking)
+
+     */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -200,7 +225,8 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     }
 
-
+//settingGeofire :  initializes a Firebase Database reference to the "MyLocation" node, where the location data will be stored.
+// Then, it creates a new GeoFire object with this reference.
     private void settingGeofire() {
         myLocationRef = FirebaseDatabase.getInstance().getReference("MyLocation");
         geoFire = new GeoFire(myLocationRef);
@@ -209,6 +235,13 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
 
     }
+/*
+    onMapReady :  adds the zoom control feature and get the current user location
+    setUpMap: adds the current location icon
+    LocationUpdates: updates the user's location
+   setOnMapLongClickListener:  sets up a listener for when the user long presses on the map,
+
+ */
 
 
     @Override
@@ -228,11 +261,11 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         mMap.setOnMapLongClickListener(this);
 
-        // Enable the user's current location if the location permission is granted
 
 
     }
 
+    //onStop: Removes location updates
     @Override
     protected void onStop() {
         fusedLocationProviderClient.removeLocationUpdates(locationCallback);
@@ -267,6 +300,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         });
     }
 
+    //Adding a marker at the current location
     private void placeMarkerOnMap(LatLng currentLatLong) {
         MarkerOptions markerOptions = new MarkerOptions().position(currentLatLong);
         markerOptions.title(currentLatLong.toString());
@@ -284,7 +318,10 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
 
 
+/*
+    onMapLongClick - Creating a geofence by long pressing the location and stores the data in Firebase
 
+ */
     @Override
     public void onMapLongClick(@NonNull LatLng latLng) {
 
@@ -318,6 +355,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         Log.d(TAG, "onSuccess: Geofence Added..."+latLng);
 
     }
+    //Monitors the user's movement and send notification
     @Override
     public void onKeyEntered(String key, GeoLocation location) {
         Log.d(TAG, "-------------ENTER");
@@ -432,6 +470,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         mMap.addCircle(circleOptions);
     }
 
+    // Adding a search bar
     public void searchLocation(View view) {
         EditText locationSearch = findViewById(R.id.Lsearch);
         String location = locationSearch.getText().toString().trim();
