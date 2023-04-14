@@ -26,6 +26,23 @@
         android:textColor="@color/white"
         android:onClick="searchLocation"
         android:text = "Search"/>
+
+    </LinearLayout>
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="horizontal">
+
+
+
+        <Button
+            android:id = "@+id/setTime"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|left"
+            android:layout_marginBottom="10dp"
+            android:text = "Set time"/>
+
     </LinearLayout>
 
 </fragment>

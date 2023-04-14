@@ -12,6 +12,7 @@ import androidx.core.location.LocationRequestCompat;
 import androidx.fragment.app.FragmentActivity;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
+import android.app.AlarmManager;
 import android.app.AlertDialog;
 import android.app.Notification;
 import android.app.NotificationChannel;
@@ -52,6 +53,8 @@ import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.BitmapDescriptorFactory;
+import com.google.android.gms.maps.model.Circle;
 import com.google.android.gms.maps.model.CircleOptions;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
@@ -61,6 +64,8 @@ import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
+import com.google.android.material.timepicker.MaterialTimePicker;
+import com.google.android.material.timepicker.TimeFormat;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
 import com.google.firebase.database.DataSnapshot;
@@ -77,12 +82,15 @@ import com.karumi.dexter.listener.PermissionDeniedResponse;
 import com.karumi.dexter.listener.PermissionGrantedResponse;
 import com.karumi.dexter.listener.PermissionRequest;
 import com.karumi.dexter.listener.single.PermissionListener;
+import com.google.android.gms.maps.GoogleMap;
+
 
 import android.Manifest;
 import android.os.Looper;
 import android.renderscript.RenderScript;
 import android.util.Log;
 import android.view.View;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.RelativeLayout;
 import android.widget.Toast;
@@ -90,8 +98,13 @@ import android.widget.Toast;
 import java.io.IOException;
 import java.security.Permission;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
+import java.util.Timer;
+import java.util.TimerTask;
 
 /*
 public class MapsActivity: Google Maps Avtivity class
@@ -118,7 +131,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     private Marker currentLocationMarker;
     private FusedLocationProviderClient fusedLocationProviderClient; //Getting the current user location
-    private float GEOFENCE_RADIUS = 500; //A radius of the geofence
+    private float GEOFENCE_RADIUS = 200; //A radius of the geofence
     private int FINE_LOCATION_ACCESS_REQUEST_CODE = 10001;
     private int BACKGROUND_LOCATION_ACCESS_REQUEST_CODE = 10002;
 
@@ -135,8 +148,21 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     private List<LatLng> safeZone;
     private LocationCallback locationCallback; // used to receive location updates from the device's location provider
 
+    // Create a list of Marker and circle
+    private HashMap<Marker, Circle> mMarkerCircleMap = new HashMap<>();
+    private HashMap<Marker, GeoQuery> mMarkerKeyMap = new HashMap<>();
+    private MaterialTimePicker picker;
+    private Calendar calendar;
 
-  //  private Boolean ENTERED = false;
+    private AlarmManager alarmManager;
+
+    private Boolean INSIDE = false;
+    private Boolean TRIGGER = false;
+
+    private Boolean START = true;
+
+    private Timer timer;
+
 
 
     /*
@@ -259,7 +285,9 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         LocationUpdates();
         setUpMap();
 
-        mMap.setOnMapLongClickListener(this);
+       mMap.setOnMapLongClickListener(this);
+       mMap.setOnMarkerClickListener(this);
+
 
 
 
@@ -293,7 +321,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 if (location != null) {
                     lastLocation = location;
                     LatLng currentLatLong = new LatLng(location.getLatitude(), location.getLongitude());
-                    placeMarkerOnMap(currentLatLong);
+                   // placeMarkerOnMap(currentLatLong);
                     mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(currentLatLong, 12f));
                 }
             }
@@ -325,13 +353,23 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     @Override
     public void onMapLongClick(@NonNull LatLng latLng) {
 
-        addMarker(latLng);
-        addCircle(latLng, GEOFENCE_RADIUS);
+
         geofenceLatLng = latLng;
         safeZone.add(latLng);
         Log.d(TAG, "safeZone"+safeZone);
-        GeoQuery geoQuery = geoFire.queryAtLocation(new GeoLocation(latLng.latitude, latLng.longitude),0.5f); // 200m
+        GeoQuery geoQuery = geoFire.queryAtLocation(new GeoLocation(latLng.latitude, latLng.longitude),0.2f); // 200m
         geoQuery.addGeoQueryEventListener(MapsActivity.this);
+        addMarkCircle(latLng, GEOFENCE_RADIUS, geoQuery);
+        Button btn = (Button) findViewById(R.id.setTime);
+        btn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                showTimePicker();
+                setAlarm();
+            }
+        });
+
+
 
         FirebaseDatabase.getInstance()
                         .getReference("SafeZone")
@@ -340,7 +378,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                                 .addOnCompleteListener(new OnCompleteListener<Void>() {
                                     @Override
                                     public void onComplete(@NonNull Task<Void> task) {
-                                        Toast.makeText(MapsActivity.this, "Updated", Toast.LENGTH_SHORT).show();
+                                        Toast.makeText(MapsActivity.this, "Safe zone created", Toast.LENGTH_SHORT).show();
 
                                     }
                                 }).addOnFailureListener(new OnFailureListener() {
@@ -353,24 +391,85 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         Log.d(TAG, "geoQuery"+geoQuery);
 
         Log.d(TAG, "onSuccess: Geofence Added..."+latLng);
+        Toast.makeText(this, "Please set depart or arrival time", Toast.LENGTH_SHORT).show();
 
     }
+
+    private void setAlarm() {
+        alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+
+    }
+
+    private void showTimePicker() {
+        picker = new MaterialTimePicker.Builder()
+                .setTimeFormat(TimeFormat.CLOCK_12H)
+                .setHour(12)
+                .setMinute(0)
+                .setTitleText("Select Time")
+                .build();
+        picker.show(getSupportFragmentManager(),"safezone");
+        picker.addOnPositiveButtonClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (picker.getHour()>12){
+                    binding.setTime.setText(
+                            String.format("%02d",picker.getHour()-12)+" : "+String.format("%02d",picker.getMinute())+"PM"
+                    );
+                }
+                else{
+                    binding.setTime.setText(
+                            String.format("%02d",picker.getHour()-12)+" : "+String.format("%02d",picker.getMinute())+"AM"
+                    );
+                }
+                calendar = Calendar.getInstance();
+                calendar.set(Calendar.HOUR_OF_DAY,picker.getHour());
+                calendar.set(Calendar.MINUTE,picker.getMinute());
+                calendar.set(Calendar.SECOND,0);
+                calendar.set(Calendar.MILLISECOND,0);
+                timer = new Timer();
+                timer.schedule(new TimerTask() {
+                    @Override
+                    public void run() {
+                        checkTime();
+                    }
+                }, 0, 10000);
+
+            }
+        });
+
+
+    }
+
+    private void checkTime() {
+        Calendar currentTime = Calendar.getInstance();
+        if (currentTime.getTimeInMillis() >= calendar.getTimeInMillis()) {
+            Log.d(TAG, "-------------CHECKING"+calendar.getTimeInMillis());
+            TRIGGER = true;
+        }
+    }
+
     //Monitors the user's movement and send notification
     @Override
     public void onKeyEntered(String key, GeoLocation location) {
         Log.d(TAG, "-------------ENTER");
-        sendNotification("EDMDev", String.format("%s entered the safe zone",key));
+        sendNotification("EDMDev", String.format("%s ENTERING SAFE ZONE",key));
+        if(!INSIDE){
+            TRIGGER = false;
+        }
     }
 
     @Override
     public void onKeyExited(String key) {
         Log.d(TAG, "-------------EXIT");
-        sendNotification("EDMDev", String.format("%s leave the safe zone",key));
+        sendNotification("EDMDev", String.format("%s ATTENTION! LEAVING THE SAFE ZONE",key));
+        if(INSIDE){
+            TRIGGER = false;
+        }
     }
 
     @Override
     public void onKeyMoved(String key, GeoLocation location) {
-        sendNotification("EDMDev", String.format("%s moving within the safe zone",key));
+        //sendNotification("EDMDev", String.format("%s hanging out in the safe zone",key));
 
     }
 
@@ -392,6 +491,8 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         Log.d(TAG, "current location: "+ currentLatLng);
         mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(currentLatLng, 16));
         Log.d(TAG, "--------------------Setting Location");
+        Log.d(TAG, "INSIDE,TRIGGER"+INSIDE+TRIGGER);
+
 
         geoFire.setLocation("Your location", new GeoLocation(location.getLatitude(), location.getLongitude()),
                 new GeoFire.CompletionListener() {
@@ -407,9 +508,24 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
 
 
-/*
         if (geofenceLatLng != null) {
-            if (isInsideGeofence(location, geofenceLatLng)&& !ENTERED) {
+            if(START){
+                if (!isInsideGeofence(location, geofenceLatLng)){
+                    INSIDE = false;
+
+                }else{
+                    INSIDE = true;
+
+                }
+
+                START = false;
+            }
+            if(!INSIDE) {
+
+                if (!isInsideGeofence(location, geofenceLatLng) && TRIGGER) {
+
+                    Toast.makeText(this, "Go to safe zone Right now! Calling the police in five minutes", Toast.LENGTH_SHORT).show();
+                /*
                 String message = "Entering Safe Zone";
                 Intent intent = new Intent();
                 intent.setAction(INTENT_ACTION);
@@ -418,27 +534,20 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 sendBroadcast(intent);
                 ENTERED = true;
 
+                 */
+
+                }
             }
-            else if(!isInsideGeofence(location, geofenceLatLng) && ENTERED) {
-                String message = "Leaving Safe Zone";
-                Intent intent = new Intent();
-                intent.setAction(INTENT_ACTION);
-                intent.putExtra("data",message);
-                Log.d(TAG, "Leaving log"+intent +intent.getStringExtra("data"));
-                sendBroadcast(intent);
-                ENTERED = false;
+            if(INSIDE) {
 
+                if (isInsideGeofence(location, geofenceLatLng) && TRIGGER) {
+
+                    Toast.makeText(this, "You are staying here for too long. Calling the police in five minutes", Toast.LENGTH_SHORT).show();
+
+                }
             }
-
-
-
 
         }
-
- */
-
-
-
 
     }
 
@@ -453,13 +562,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
 
-
-    private void addMarker(LatLng latLng)
-    {
-        MarkerOptions markerOptions= new MarkerOptions().position(latLng);
-        mMap.addMarker(markerOptions);
-    }
-    private void addCircle(LatLng latLng, float radius)
+    private void addMarkCircle(LatLng latLng, float radius, GeoQuery geoQuery)
     {
         CircleOptions circleOptions = new CircleOptions();
         circleOptions.center(latLng);
@@ -467,7 +570,15 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         circleOptions.strokeColor(Color.argb(255,255,0,0));
         circleOptions.fillColor(Color.argb(64,255,0,0));
         circleOptions.strokeWidth(4);
-        mMap.addCircle(circleOptions);
+        Circle circle =  mMap.addCircle(circleOptions);
+        MarkerOptions markerOptions= new MarkerOptions().position(latLng)
+                .title("safe zone")
+                .snippet("click to remove")
+                .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN));
+        Marker marker = mMap.addMarker(markerOptions);
+        marker.setTag(false);
+        mMarkerCircleMap.put(marker, circle);
+        mMarkerKeyMap.put(marker, geoQuery);
     }
 
     // Adding a search bar
@@ -524,9 +635,33 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
 
     }
+         @Override
+            public boolean onMarkerClick (@NonNull Marker marker){
+            Circle circle = mMarkerCircleMap.get(marker);
+            GeoQuery geoQuery = mMarkerKeyMap.get(marker);
+            if (circle != null && geoQuery != null) {
+                circle.remove();
+                mMarkerCircleMap.remove(marker);
+                mMarkerKeyMap.remove(marker);
+                marker.remove();
+                geofenceLatLng = null;
+                geoQuery.removeAllListeners();
+                Log.d(TAG, "--------------------Safe Zone discarded");
+                Toast.makeText(this, "Safe Zone discarded.", Toast.LENGTH_SHORT).show();
 
-    @Override
-    public boolean onMarkerClick(@NonNull Marker marker) {
-        return false;
+                TRIGGER = false;
+                Log.d(TAG, "TRIGGER" +TRIGGER);
+                START = true;
+                if (timer != null) {
+                    calendar.clear();
+                    timer.cancel();
+                    timer = null;
+                }
+
+
+            }
+            return true;
     }
+
+
 }
